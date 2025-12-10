@@ -25,92 +25,74 @@ BACKEND_URL = "http://localhost:8000/chat"
 
 
 # -----------------------------------------------------
-# FORMAT SPEC INTO FANCY CARDS
+# UNIVERSAL SPEC RENDERER — WORKS WITH ANY SCHEMA SHAPE
 # -----------------------------------------------------
+def pretty_value(v):
+    """Recursively pretty-render ANY JSON value."""
+    if v is None:
+        return ui.label("—").classes("text-slate-500 text-xs")
+    
+    # Primitive
+    if isinstance(v, (str, int, float, bool)):
+        return ui.label(str(v)).classes("text-xs text-slate-700")
+    
+    # List
+    if isinstance(v, list):
+        with ui.column().classes("gap-1"):
+            for item in v:
+                with ui.row().classes("gap-1 items-center"):
+                    ui.icon("chevron_right", size="10px").classes("text-slate-400")
+                    pretty_value(item)
+        return
+    
+    # Dict (structured object)
+    if isinstance(v, dict):
+        with ui.column().classes("gap-1 bg-slate-50 rounded-md p-1 border border-slate-200"):
+            for key, val in v.items():
+                with ui.row().classes("gap-1 items-start"):
+                    ui.label(f"{key}:").classes("text-[10px] font-bold text-slate-600")
+                    pretty_value(val)
+        return
+
+    # fallback (should not happen)
+    return ui.label(str(v)).classes("text-xs text-slate-700")
+
+
 def render_spec_cards(spec: dict):
-    """Render spec as fancy info cards."""
+    """Render ANY spec into dynamic cards based on schema, no hardcoding."""
     spec_footer.clear()
     
-    if not spec or all(not v for v in spec.values()):
+    if not spec or all(v in [None, "", [], {}] for v in spec.values()):
         with spec_footer:
             with ui.row().classes('w-full h-full items-center justify-center'):
                 ui.label('💡 No specification yet. Start chatting to build your system!').classes(
                     'text-slate-400 text-sm italic'
                 )
         return
-    
+
     with spec_footer:
-        with ui.row().classes('w-full gap-2 items-stretch'):
-            # Task Card
-            if spec.get('task'):
-                with ui.card().classes('flex-1 bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200 shadow-sm p-2'):
-                    with ui.row().classes('items-center gap-1 mb-1'):
-                        ui.icon('task_alt', size='16px').classes('text-blue-600')
-                        ui.label('Task').classes('text-xs font-bold text-blue-900')
-                    ui.label(spec['task']).classes('text-xs text-slate-700 leading-tight')
-            
-            # Goal Card
-            if spec.get('goal'):
-                with ui.card().classes('flex-1 bg-gradient-to-br from-green-50 to-green-100 border-green-200 shadow-sm p-2'):
-                    with ui.row().classes('items-center gap-1 mb-1'):
-                        ui.icon('flag', size='16px').classes('text-green-600')
-                        ui.label('Goal').classes('text-xs font-bold text-green-900')
-                    ui.label(spec['goal']).classes('text-xs text-slate-700 leading-tight')
-            
-            # Agents Card
-            if spec.get('agents'):
-                with ui.card().classes('flex-1 bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200 shadow-sm p-2'):
-                    with ui.row().classes('items-center gap-1 mb-1'):
-                        ui.icon('groups', size='16px').classes('text-purple-600')
-                        ui.label('Agents').classes('text-xs font-bold text-purple-900')
-                    if isinstance(spec['agents'], list):
-                        for agent in spec['agents']:
-                            with ui.row().classes('gap-1 items-center'):
-                                ui.icon('android', size='12px').classes('text-purple-500')
-                                ui.label(agent).classes('text-xs text-slate-700')
-                    else:
-                        ui.label(str(spec['agents'])).classes('text-xs text-slate-700')
-            
-            # Tools Card
-            if spec.get('tools'):
-                with ui.card().classes('flex-1 bg-gradient-to-br from-amber-50 to-amber-100 border-amber-200 shadow-sm p-2'):
-                    with ui.row().classes('items-center gap-1 mb-1'):
-                        ui.icon('build', size='16px').classes('text-amber-600')
-                        ui.label('Tools').classes('text-xs font-bold text-amber-900')
-                    if isinstance(spec['tools'], list):
-                        for tool in spec['tools']:
-                            with ui.row().classes('gap-1 items-center'):
-                                ui.icon('construction', size='12px').classes('text-amber-500')
-                                ui.label(tool).classes('text-xs text-slate-700')
-                    else:
-                        ui.label(str(spec['tools'])).classes('text-xs text-slate-700')
-        
-        # Second row for additional properties
-        if spec.get('communication') or spec.get('topology') or spec.get('constraints'):
-            with ui.row().classes('w-full gap-3 items-start mt-3'):
-                # Communication
-                if spec.get('communication'):
-                    with ui.card().classes('flex-1 bg-gradient-to-br from-cyan-50 to-cyan-100 border-cyan-200 shadow-sm'):
-                        with ui.row().classes('items-center gap-2 mb-1'):
-                            ui.icon('forum', size='18px').classes('text-cyan-600')
-                            ui.label('Communication').classes('text-xs font-bold text-cyan-900')
-                        ui.label(str(spec['communication'])).classes('text-xs text-slate-700 leading-snug')
-                
-                # Topology
-                if spec.get('topology'):
-                    with ui.card().classes('flex-1 bg-gradient-to-br from-pink-50 to-pink-100 border-pink-200 shadow-sm'):
-                        with ui.row().classes('items-center gap-2 mb-1'):
-                            ui.icon('hub', size='18px').classes('text-pink-600')
-                            ui.label('Topology').classes('text-xs font-bold text-pink-900')
-                        ui.label(str(spec['topology'])).classes('text-xs text-slate-700 leading-snug')
-                
-                # Constraints
-                if spec.get('constraints'):
-                    with ui.card().classes('flex-1 bg-gradient-to-br from-red-50 to-red-100 border-red-200 shadow-sm'):
-                        with ui.row().classes('items-center gap-2 mb-1'):
-                            ui.icon('gpp_maybe', size='18px').classes('text-red-600')
-                            ui.label('Constraints').classes('text-xs font-bold text-red-900')
-                        ui.label(str(spec['constraints'])).classes('text-xs text-slate-700 leading-snug')
+        # Changed to grid layout for responsive cards
+        with ui.element('div').classes("w-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2"):
+
+            for field, value in spec.items():
+
+                # Skip empty values
+                if value in [None, "", [], {}]:
+                    continue
+
+                # Card styling (dynamic)
+                with ui.card().classes(
+                    "w-full bg-white border border-slate-200 rounded-lg shadow-sm p-2"
+                ):
+                    # Title row
+                    with ui.row().classes("items-center gap-1 mb-1"):
+                        ui.icon("label", size="14px").classes("text-blue-600")
+                        ui.label(field.title()).classes(
+                            "text-[11px] font-bold text-slate-800"
+                        )
+
+                    # Render value dynamically
+                    pretty_value(value)
 
 
 # -----------------------------------------------------
@@ -122,7 +104,7 @@ async def send_message():
     text = user_input.value.strip()
     if not text:
         return
-
+        
     # Clear input and show message immediately
     user_input.value = ''
     add_user_message(text)
