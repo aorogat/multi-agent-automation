@@ -1,50 +1,89 @@
 import json
 from backend.engine.requirements_agent.agent import RequirementsAgent
 from backend.engine.requirements_agent.spec_model import SpecificationModel
+from backend.engine.visualization.visualization_manager import VisualizationManager
 from backend.utils.logger import debug
+import requests
+
 
 
 class MASAutomationEngine:
     """
     Core engine that:
-    - Holds the MAS specification (SpecificationModel)
-    - Sends user messages + spec to RequirementsAgent
-    - Applies updates to the spec
-    - Returns reply + graph + updated spec to API/UI
+    - Maintains MAS specification (SpecificationModel)
+    - Interacts with RequirementsAgent for schema-aligned updates
+    - Uses VisualizationManager to generate a graph from the spec
+    - Returns: assistant reply + graph JSON + spec JSON
     """
 
     def __init__(self):
-        # Specification is now schema-driven and dynamic
+        # Dynamic, schema-driven MAS specification
         self.spec = SpecificationModel()
 
-        # RequirementsAgent no longer needs API key; uses centralized LLM manager
+        # Requirement collection via LLM
         self.req_agent = RequirementsAgent()
 
-    def process(self, message, history):
-        debug(f"MAS Engine processing message: {message}")
-        debug(f"Spec before requirement update:\n{json.dumps(self.spec.to_dict(), indent=2)}")
+        # Visualization subsystem (LLM → IR → GraphBuilder)
+        self.visualizer = VisualizationManager()
 
-        # Run RequirementsAgent
+    # ------------------------------------------------------------------
+    # PROCESS USER MESSAGE
+    # ------------------------------------------------------------------
+    def process(self, message, history):
+        debug(f"\n===== MAS Engine processing message: {message} =====")
+
+        before = self.spec.to_dict()
+        debug(f"Spec BEFORE update:\n{json.dumps(before, indent=2)}")
+
+        # ------------------------------------------------------------
+        # 1. REQUIREMENTS AGENT — Schema-aware spec update
+        # ------------------------------------------------------------
         agent_output = self.req_agent.run(
             user_message=message,
             current_spec=self.spec,
             history=history,
         )
 
-        debug(f"Agent output:\n{json.dumps(agent_output, indent=2)}")
+        debug(f"RequirementsAgent OUTPUT:\n{json.dumps(agent_output, indent=2)}")
 
-        # Update spec with deltas proposed by RequirementsAgent
-        self.spec.update(agent_output.get("updated_fields", {}))
+        updates = agent_output.get("updated_fields", {})
+        if updates:
+            self.spec.update(updates)
 
-        debug(f"Spec after applying updates:\n{json.dumps(self.spec.to_dict(), indent=2)}")
+        after = self.spec.to_dict()
+        debug(f"Spec AFTER update:\n{json.dumps(after, indent=2)}")
 
-        # Agent message to user
-        reply = agent_output["reply"]
+        # ------------------------------------------------------------
+        # 2. VISUALIZATION PIPELINE — Convert spec → IR → graph
+        # ------------------------------------------------------------
+        try:
+            graph = self.visualizer.generate_graph(after)
 
-        # Placeholder graph (will later depend on agents/topology)
-        graph = [
-            {"data": {"id": "system", "label": "MAS System"}}
-        ]
+            # Guarantee structure is list-of-dicts for Cytoscape
+            if not isinstance(graph, list):
+                debug("Graph was not a list. Wrapping inside placeholder.")
+                graph = [{"data": {"id": "invalid_graph", "label": "Invalid Graph"}}]
 
-        # Send spec dict to UI
-        return reply, graph, self.spec.to_dict()
+
+
+        except Exception as e:
+            debug(f"Graph generation FAILED: {e}")
+
+            # Provide a safe fallback graph so UI never breaks
+            graph = [
+                {"data": {"id": "system", "label": "MAS System"}},
+                {"data": {"id": "error", "label": "Graph Error"}},
+            ]
+        
+        debug(f"Try to update the graph {graph}")
+        requests.post(
+            "http://localhost:8050/update-graph",
+            json={"elements": graph}
+        )
+
+        # ------------------------------------------------------------
+        # 3. COLLECT REPLY FOR USER
+        # ------------------------------------------------------------
+        reply = agent_output.get("reply", "Okay.")
+
+        return reply, graph, after

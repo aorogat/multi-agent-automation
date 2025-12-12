@@ -3,6 +3,8 @@
 import os
 from dotenv import load_dotenv
 from openai import OpenAI
+import re
+import json
 
 # ---------------------------------------------------------
 # LOAD ENVIRONMENT AND GLOBAL LLM CONFIG
@@ -63,15 +65,41 @@ class LLM:
     def generate_json(prompt: str) -> dict:
         """
         Prompts the model and tries to parse the output as JSON.
-        Safely falls back if JSON is malformed.
-        """
-        response = LLM.generate(prompt)
+        Automatically strips markdown fences like ```json and ```.
 
+        Returns:
+            dict: Parsed JSON object
+                  or {"raw_output": "..."} on failure
+        """
+        raw = LLM.generate(prompt).strip()
+
+        # ---------------------------------------------------------
+        # Remove Markdown fences: ```json ... ``` or ``` ... ```
+        # ---------------------------------------------------------
+        # Remove opening ```json or ```
+        if raw.startswith("```"):
+            raw = raw.lstrip("`")
+            raw = raw.replace("json", "", 1).strip()
+
+        # Remove trailing ```
+        if raw.endswith("```"):
+            raw = raw[:-3].strip()
+
+        # Also handle multi-line fenced blocks
+        import re
+        fenced = re.findall(r"```(?:json)?(.*?)```", raw, re.DOTALL)
+        if fenced:
+            raw = fenced[0].strip()
+
+        # ---------------------------------------------------------
+        # Attempt JSON parsing
+        # ---------------------------------------------------------
         try:
-            import json
-            return json.loads(response)
+            return json.loads(raw)
         except Exception:
-            return {"raw_output": response}
+            # Return raw output for debugging
+            return {"raw_output": raw}
+
 
     # ---------------------------------------------------------
     # CHAT-STYLE INTERFACE (future ready)
