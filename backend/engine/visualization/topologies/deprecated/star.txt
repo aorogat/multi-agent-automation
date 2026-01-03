@@ -1,0 +1,2 @@
+A star topology has one central hub connected to many peripheral nodes.
+Good for broadcast or shared-resource interactions.

@@ -26,7 +26,7 @@ class GraphLLMPlanner:
     def __init__(self):
         print(f"Trying to load {TOPOLOGY_DIR}=========================================================================")
         loader = TopologyLoader(TOPOLOGY_DIR)
-        self.topology_classes = loader.topologies
+        self.topology_classes = loader.load()
         self.topology_docs = self._build_topology_docs()
 
     # ------------------------------------------------------------------

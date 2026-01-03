@@ -60,11 +60,44 @@ class SpecificationModel:
                 self.values[key] = str(new_value).strip()
 
             # --------------------------
-            # DICT
+            # DICT (including structured dicts)
             # --------------------------
             elif ftype == "dict":
                 if not isinstance(new_value, dict):
                     raise ValueError(f"Expected dict for field '{key}', got {type(new_value)}")
+                
+                # Validate structure if schema defines it
+                if "structure" in schema:
+                    for skey, stype in schema["structure"].items():
+                        # Only validate required structure fields if they're present
+                        # (optional fields may not be in new_value)
+                        if skey in new_value:
+                            # Basic type checking for structure fields
+                            expected_type = stype
+                            actual_value = new_value[skey]
+                            
+                            if expected_type == "string" and not isinstance(actual_value, str):
+                                raise ValueError(
+                                    f"Field '{key}.{skey}' expects string, got {type(actual_value)}"
+                                )
+                            elif expected_type == "integer" and not isinstance(actual_value, int):
+                                raise ValueError(
+                                    f"Field '{key}.{skey}' expects integer, got {type(actual_value)}"
+                                )
+                            elif expected_type == "boolean" and not isinstance(actual_value, bool):
+                                raise ValueError(
+                                    f"Field '{key}.{skey}' expects boolean, got {type(actual_value)}"
+                                )
+                            elif expected_type == "list" and not isinstance(actual_value, list):
+                                raise ValueError(
+                                    f"Field '{key}.{skey}' expects list, got {type(actual_value)}"
+                                )
+                            elif expected_type == "dict" and not isinstance(actual_value, dict):
+                                raise ValueError(
+                                    f"Field '{key}.{skey}' expects dict, got {type(actual_value)}"
+                                )
+                
+                # Update dict (merge, not replace)
                 self.values[key].update(new_value)
 
             # --------------------------
@@ -82,11 +115,32 @@ class SpecificationModel:
                         if not isinstance(obj, dict):
                             raise ValueError(f"Field '{key}' expects structured dict items, got: {obj}")
 
+                        # Validate types for fields that are present
+                        # (fields may be optional, so we only validate when present)
                         for skey, stype in schema["structure"].items():
-                            if skey not in obj:
-                                raise ValueError(
-                                    f"Missing '{skey}' in structured object for field '{key}'."
-                                )
+                            if skey in obj:
+                                actual_value = obj[skey]
+                                
+                                if stype == "string" and not isinstance(actual_value, str):
+                                    raise ValueError(
+                                        f"Field '{key}[].{skey}' expects string, got {type(actual_value)}"
+                                    )
+                                elif stype == "integer" and not isinstance(actual_value, int):
+                                    raise ValueError(
+                                        f"Field '{key}[].{skey}' expects integer, got {type(actual_value)}"
+                                    )
+                                elif stype == "boolean" and not isinstance(actual_value, bool):
+                                    raise ValueError(
+                                        f"Field '{key}[].{skey}' expects boolean, got {type(actual_value)}"
+                                    )
+                                elif stype == "list" and not isinstance(actual_value, list):
+                                    raise ValueError(
+                                        f"Field '{key}[].{skey}' expects list, got {type(actual_value)}"
+                                    )
+                                elif stype == "dict" and not isinstance(actual_value, dict):
+                                    raise ValueError(
+                                        f"Field '{key}[].{skey}' expects dict, got {type(actual_value)}"
+                                    )
 
                     # Overwrite or extend
                     if schema.get("replace_on_update", False):

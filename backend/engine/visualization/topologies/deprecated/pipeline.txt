@@ -1,0 +1,3 @@
+A pipeline topology connects agents sequentially.
+Nodes are arranged in a directed line: A → B → C → ...
+Useful for workflows or staged processing.

@@ -1,0 +1,3 @@
+A hierarchical topology organizes agents in layers.
+Top node supervises children, each child may have its own children.
+Useful for teacher → students, admin → teachers relations.
