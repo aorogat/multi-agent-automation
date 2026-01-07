@@ -1,0 +1,21 @@
+# Core Framework
+fastapi>=0.100.0
+uvicorn>=0.23.0
+pydantic>=2.0.0
+
+# Frontend
+nicegui>=1.4.0
+
+# LLM Integration
+openai>=1.0.0
+python-dotenv>=1.0.0
+
+# HTTP Client
+httpx>=0.24.0
+
+# PDF Generation (for Guidance Agent)
+reportlab>=4.0.0
+
+# Optional but useful
+langchain>=0.1.0
+

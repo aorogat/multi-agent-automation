@@ -26,6 +26,8 @@ thinking_indicator = None
 dash_iframe = None
 
 BACKEND_URL = "http://localhost:8000/chat"
+GUIDANCE_URL = "http://localhost:8000/generate-guidance"
+DOWNLOAD_BASE_URL = "http://localhost:8000/download-guidance"
 
 
 # ---------------------------------------------------------
@@ -162,9 +164,15 @@ with ui.column().classes(
 
     with ui.row().classes('w-full p-4 bg-white border-b border-slate-200 shadow-sm items-center gap-3'):
         ui.icon('smart_toy', size='28px').classes('text-blue-600')
-        with ui.column().classes('gap-0'):
+        with ui.column().classes('gap-0 flex-grow'):
             ui.label('MAS Automation').classes('text-xl font-bold text-slate-800')
             ui.label('Multi-Agent System Designer').classes('text-xs text-slate-500')
+        
+        # Generate Guidance Button
+        guidance_button = ui.button(
+            'Generate Guidance Report',
+            icon='description'
+        ).props('outlined').classes('bg-green-600 text-white hover:bg-green-700')
 
     chat_scroll = ui.scroll_area().classes('flex-grow px-3 py-3')
     with chat_scroll:
@@ -226,9 +234,75 @@ with ui.column().classes(
                     ui.label(f"Error: {t}").classes('text-red-700')
         chat_scroll.scroll_to(pixels=999999)
 
+    async def generate_guidance_report():
+        """Generate guidance report (PDF and JSON) from current specification."""
+        global thinking_indicator
+        
+        # Show thinking indicator
+        add_thinking_message()
+        thinking_indicator_text = "Generating guidance report..."
+        if thinking_indicator:
+            # Update the thinking message
+            with thinking_indicator:
+                thinking_indicator.clear()
+                ui.icon('description', size='18px').classes('text-green-600 mt-1')
+                with ui.card().classes(
+                    'max-w-[70%] bg-green-100 border border-green-200 shadow-sm p-2 rounded-lg text-xs'
+                ):
+                    with ui.row().classes('items-center gap-2'):
+                        ui.spinner(size='xs', color='green')
+                        ui.label(thinking_indicator_text).classes('text-green-800')
+        
+        try:
+            async with httpx.AsyncClient(timeout=httpx.Timeout(300.0)) as client_http:  # 5 min timeout for guidance generation
+                response = await client_http.post(GUIDANCE_URL)
+                data = response.json()
+            
+            if thinking_indicator:
+                thinking_indicator.delete()
+                thinking_indicator = None
+            
+            if data.get("success"):
+                # Show success message with download links
+                json_url = data.get("json_url")
+                pdf_url = data.get("pdf_url")
+                
+                with chat_container:
+                    with ui.row().classes('w-full justify-start items-start gap-2'):
+                        ui.icon('check_circle', size='18px').classes('text-green-600 mt-1')
+                        with ui.card().classes(
+                            'max-w-[70%] bg-green-50 border border-green-200 shadow-sm p-2 rounded-lg text-xs'
+                        ):
+                            ui.label("✅ Guidance report generated successfully!").classes('text-green-800 font-bold mb-2')
+                            with ui.column().classes('gap-1 mt-2'):
+                                if json_url:
+                                    ui.link(
+                                        '📄 Download JSON Report',
+                                        f"{DOWNLOAD_BASE_URL}/{json_url.split('/')[-1]}",
+                                        new_tab=True
+                                    ).classes('text-blue-600 hover:text-blue-800 text-xs')
+                                if pdf_url:
+                                    ui.link(
+                                        '📑 Download PDF Report',
+                                        f"{DOWNLOAD_BASE_URL}/{pdf_url.split('/')[-1]}",
+                                        new_tab=True
+                                    ).classes('text-blue-600 hover:text-blue-800 text-xs')
+                
+                chat_scroll.scroll_to(pixels=999999)
+            else:
+                error_msg = data.get("message", "Unknown error")
+                add_error_message(f"Failed to generate guidance: {error_msg}")
+                
+        except Exception as e:
+            if thinking_indicator:
+                thinking_indicator.delete()
+                thinking_indicator = None
+            add_error_message(f"Error generating guidance report: {str(e)}")
+            chat_scroll.scroll_to(pixels=999999)
 
     user_input.on('keydown.enter', send_message)
     send_button.on('click', send_message)
+    guidance_button.on('click', generate_guidance_report)
 
 
 # ---------------------------------------------------------
